@@ -1,0 +1,6 @@
+{
+  "name": "ZayList",
+  "description": "A modern, mobile-first grocery reminder app with Myanmar voice input and offline support.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": []
+}
