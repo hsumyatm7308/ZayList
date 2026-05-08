@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Mic, MicOff, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -19,18 +21,26 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
       const recognizer = new SpeechRecognition();
       
       recognizer.continuous = false;
-      recognizer.interimResults = false;
+      recognizer.interimResults = true;
       recognizer.lang = 'my-MM'; // Myanmar language support
 
       recognizer.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
-        onTranscript(transcript);
-        setIsListening(false);
+        if (event.results[0].isFinal) {
+          onTranscript(transcript);
+          setIsListening(false);
+        }
       };
 
       recognizer.onerror = (event: any) => {
         console.error('Speech recognition error', event.error);
-        setError(event.error);
+        if (event.error === 'not-allowed') {
+          setError('Microphone permission denied');
+        } else if (event.error === 'no-speech') {
+          // Silent failure for no speech
+        } else {
+          setError(event.error);
+        }
         setIsListening(false);
       };
 
@@ -44,8 +54,12 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
     }
   }, [onTranscript]);
 
-  const toggleListening = useCallback(() => {
+  const toggleListening = useCallback(async () => {
     if (!recognition) return;
+
+    if (Capacitor.isNativePlatform()) {
+      await Haptics.impact({ style: ImpactStyle.Medium });
+    }
 
     if (isListening) {
       recognition.stop();
@@ -56,6 +70,7 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
         setIsListening(true);
       } catch (err) {
         console.error('Start error', err);
+        setIsListening(false);
       }
     }
   }, [isListening, recognition]);
@@ -66,12 +81,13 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={toggleListening}
-        disabled={!!error && error !== 'no-speech'}
+        disabled={!!error && error.includes('supported')}
         className={cn(
           "relative flex h-12 w-12 items-center justify-center rounded-full transition-all duration-300",
           isListening 
             ? "bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]" 
-            : "bg-surface-dark/5 text-surface-dark hover:bg-surface-dark/10"
+            : "bg-surface-dark/5 text-surface-dark hover:bg-surface-dark/10",
+          !!error && error.includes('permission') && "bg-amber-100 text-amber-600"
         )}
       >
         <AnimatePresence mode="wait">
@@ -84,6 +100,15 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
             >
               <Mic className="h-6 w-6" />
             </motion.div>
+          ) : error && error.includes('permission') ? (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+            >
+              <AlertCircle className="h-6 w-6" />
+            </motion.div>
           ) : (
             <motion.div
               key="static"
@@ -91,7 +116,7 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
             >
-              <MicOff className="h-6 w-6 opacity-40" />
+              <Mic className="h-6 w-6 opacity-40" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -107,18 +132,32 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
         )}
       </motion.button>
       
-      {isListening && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-surface-dark px-3 py-1 text-xs font-medium text-white shadow-xl"
-        >
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            နားထောင်နေသည်...
-          </div>
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {isListening && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-surface-dark px-3 py-1 text-xs font-medium text-white shadow-xl"
+          >
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin text-red-400" />
+              နားထောင်နေသည်...
+            </div>
+          </motion.div>
+        )}
+
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-red-500"
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

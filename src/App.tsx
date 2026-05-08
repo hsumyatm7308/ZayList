@@ -4,10 +4,13 @@ import { FilterSection } from './components/FilterSection';
 import { GroceryCard } from './components/GroceryCard';
 import { AddItemPanel } from './components/AddItemPanel';
 import { ConfirmationModal } from './components/ConfirmationModal';
+import { BottomNav } from './components/BottomNav';
 import { useStore } from './lib/store';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingCart, LayoutList, CheckCircle, PackageSearch, Trash2 } from 'lucide-react';
+import { ShoppingCart, CheckCircle, PackageSearch, Trash2 } from 'lucide-react';
 import { cn } from './lib/utils';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { Capacitor } from '@capacitor/core';
 
 export default function App() {
   const { items, searchQuery, sortBy, categoryFilter, shoppingMode, clearAllItems, clearPurchased } = useStore();
@@ -73,15 +76,44 @@ export default function App() {
   const progress = totalCount > 0 ? (purchasedCount / totalCount) * 100 : 0;
 
   useEffect(() => {
-    // Request notification permission on first load
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
+    const setupNotifications = async () => {
+      if (Capacitor.getPlatform() !== 'web') {
+        const permission = await LocalNotifications.requestPermissions();
+        if (permission.display === 'granted') {
+          // Schedule a weekly reminder if the list isn't empty
+          if (items.length > 0) {
+            await LocalNotifications.schedule({
+              notifications: [
+                {
+                  title: "Grocery Reminder 🛒",
+                  body: `You have ${items.length} items on your list. Time to shop!`,
+                  id: 1,
+                  schedule: { at: new Date(Date.now() + 1000 * 60 * 60 * 24) }, // Next 24h
+                  sound: 'default'
+                }
+              ]
+            });
+          }
+        }
+      } else if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    };
+
+    setupNotifications();
+  }, [items.length]);
+
+  const isNative = Capacitor.isNativePlatform();
 
   return (
-    <div className="min-h-screen bg-surface selection:bg-black selection:text-white">
-      <div className="mx-auto max-w-lg bg-white min-h-screen shadow-2xl shadow-black/5 relative pb-32">
+    <div className={cn(
+      "min-h-screen bg-surface selection:bg-black selection:text-white",
+      isNative && "pb-20" // Extra padding for bottom nav
+    )}>
+      <div className={cn(
+        "mx-auto max-w-lg bg-white min-h-screen shadow-2xl shadow-black/5 relative pb-32",
+        isNative && "pb-40"
+      )}>
         <Header />
         
         {!shoppingMode && <FilterSection />}
@@ -179,6 +211,8 @@ export default function App() {
         </main>
 
         {!shoppingMode && <AddItemPanel />}
+
+        <BottomNav />
 
         <ConfirmationModal
           isOpen={confirmModal.isOpen}
