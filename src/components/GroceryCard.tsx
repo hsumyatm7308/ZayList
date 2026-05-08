@@ -63,7 +63,7 @@ export function GroceryCard({ item, isShoppingMode }: GroceryCardProps) {
         exit={{ opacity: 0, x: -20 }}
         whileHover={!isShoppingMode ? { y: -2 } : {}}
         className={cn(
-          "relative flex items-center gap-4 border border-black/5 bg-white p-4 transition-all duration-200",
+          "group relative flex items-center gap-4 border border-black/5 bg-white p-4 transition-all duration-200",
           item.purchased && !isShoppingMode && "opacity-60 grayscale-[0.5]"
         )}
       >
@@ -105,7 +105,7 @@ export function GroceryCard({ item, isShoppingMode }: GroceryCardProps) {
         </div>
 
         {!isShoppingMode && (
-          <div className="hidden items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 sm:flex">
+          <div className="flex items-center gap-1 transition-opacity sm:opacity-0 group-hover:opacity-100">
             <button
               onClick={() => setIsEditing(true)}
               className="flex h-10 w-10 items-center justify-center rounded-xl text-blue-500 hover:bg-blue-50 active:scale-90"

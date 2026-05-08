@@ -8,7 +8,7 @@ export type Category =
   | 'Medicine' 
   | 'Others';
 
-export type SortOption = 'newest' | 'alphabetical' | 'purchased';
+export type SortOption = 'newest';
 
 export interface GroceryItem {
   id: string;

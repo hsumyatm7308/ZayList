@@ -9,9 +9,7 @@ const CATEGORIES: (Category | 'All')[] = [
 ];
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
-  { value: 'newest', label: 'Recent' },
-  { value: 'alphabetical', label: 'A-Z' },
-  { value: 'purchased', label: 'Status' }
+  { value: 'newest', label: 'Recent' }
 ];
 
 export function FilterSection() {

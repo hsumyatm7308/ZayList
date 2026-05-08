@@ -62,9 +62,12 @@ export default function App() {
 
     // Sort
     result.sort((a, b) => {
+      // Always put purchased items at the bottom
+      if (a.purchased !== b.purchased) {
+        return a.purchased ? 1 : -1;
+      }
+      
       if (sortBy === 'newest') return b.createdAt - a.createdAt;
-      if (sortBy === 'alphabetical') return a.name.localeCompare(b.name);
-      if (sortBy === 'purchased') return Number(a.purchased) - Number(b.purchased);
       return 0;
     });
 

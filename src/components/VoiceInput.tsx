@@ -36,8 +36,8 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
         console.error('Speech recognition error', event.error);
         if (event.error === 'not-allowed') {
           setError('Microphone permission denied');
-        } else if (event.error === 'no-speech') {
-          // Silent failure for no speech
+        } else if (event.error === 'no-speech' || event.error === 'aborted') {
+          // Silent failure for no speech or manual abortion
         } else {
           setError(event.error);
         }
@@ -116,7 +116,7 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
             >
-              <Mic className="h-6 w-6 opacity-40" />
+              <MicOff className="h-6 w-6 opacity-40" />
             </motion.div>
           )}
         </AnimatePresence>
