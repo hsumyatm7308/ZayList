@@ -15,7 +15,11 @@
   }
 }
 
-/* Custom list transition */
+@layer utilities {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
 .list-move,
 .list-enter-active,
 .list-leave-active {

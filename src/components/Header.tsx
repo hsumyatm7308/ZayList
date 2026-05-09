@@ -27,31 +27,26 @@ export function Header() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-black/40">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
             </span>
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-[10px] font-black uppercase tracking-widest text-black/40">Remaining</p>
+                <p className={cn(
+                  "text-lg font-black leading-none",
+                  unpurchasedCount > 0 ? "text-red-500" : "text-black/20"
+                )}>
+                  {unpurchasedCount} {unpurchasedCount === 1 ? 'item' : 'items'}
+                </p>
+              </div>
               <button
                 onClick={() => setShoppingMode(!shoppingMode)}
                 className={cn(
-                  "relative flex h-12 items-center justify-center transition-all duration-300",
+                  "relative flex h-12 w-12 items-center justify-center transition-all duration-300 rounded-full",
                   shoppingMode 
-                    ? "w-12 rounded-full bg-green-500 text-white shadow-lg shadow-green-200" 
-                    : "gap-3 rounded-2xl bg-black/5 px-5 text-black hover:bg-black/10"
+                    ? "bg-green-500 text-white shadow-lg shadow-green-200" 
+                    : "bg-black/5 text-black hover:bg-black/10"
                 )}
               >
-                {shoppingMode ? (
-                  <>
-                    <span className="text-xs font-bold uppercase tracking-wider">
-                      <ShoppingCart className="h-6 w-6" />
-
-                    </span>
-                  </>
-                ) :(
-                  <ShoppingCart className="h-6 w-6" />
-                )}
-                {unpurchasedCount > 0 && !shoppingMode && (
-                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white shadow-lg shadow-red-200">
-                    {unpurchasedCount}
-                  </span>
-                )}
+                <ShoppingCart className="h-6 w-6" />
               </button>
             </div>
           </div>

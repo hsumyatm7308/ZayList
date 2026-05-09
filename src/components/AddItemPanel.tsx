@@ -52,7 +52,7 @@ export function AddItemPanel() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-8 right-8 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-black text-white shadow-2xl shadow-black/20"
+        className="fixed bottom-24 right-6 z-[90] flex h-16 w-16 items-center justify-center rounded-full bg-black text-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] active:bg-zinc-800"
       >
         <Plus className="h-8 w-8" />
       </motion.button>
@@ -65,16 +65,16 @@ export function AddItemPanel() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+              className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md"
             />
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="fixed inset-x-0 bottom-0 z-50 rounded-t-[32px] bg-white p-8 pb-12 shadow-2xl"
+              className="fixed inset-x-0 bottom-0 z-[200] max-h-[90vh] overflow-y-auto rounded-t-[40px] bg-white p-8 pb-12 shadow-[0_-15px_50px_rgba(0,0,0,0.15)] safe-area-bottom"
             >
-              <div className="mx-auto mb-6 h-1.5 w-12 rounded-full bg-black/10" />
+              <div className="mx-auto mb-8 h-1.5 w-16 rounded-full bg-black/10" />
               
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold tracking-tight">Add Item</h2>

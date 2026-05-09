@@ -5,16 +5,17 @@ import { cn } from '../lib/utils';
 import { useStore } from '../lib/store';
 
 export function BottomNav() {
-  const { shoppingMode, setShoppingMode } = useStore();
+  const { shoppingMode, setShoppingMode, items } = useStore();
+  const unpurchasedCount = items.filter(i => !i.purchased).length;
   
   if (!Capacitor.isNativePlatform()) return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-20 items-center justify-around border-t border-black/5 bg-white px-6 pb-2 backdrop-blur-md">
+    <nav className="fixed bottom-0 left-0 right-0 z-[100] flex h-20 items-center justify-around border-t border-black/5 bg-white px-6 pb-2 backdrop-blur-md safe-area-bottom">
       <button 
         onClick={() => setShoppingMode(false)}
         className={cn(
-          "flex flex-col items-center gap-1",
+          "relative flex flex-col items-center gap-1",
           !shoppingMode ? "text-black" : "text-black/30"
         )}
       >
@@ -31,11 +32,22 @@ export function BottomNav() {
       <button 
         onClick={() => setShoppingMode(true)}
         className={cn(
-          "flex flex-col items-center gap-1",
+          "relative flex flex-col items-center gap-1",
           shoppingMode ? "text-green-600" : "text-black/30"
         )}
       >
-        <ShoppingCart className="h-6 w-6" />
+        <div className="relative">
+          <ShoppingCart className="h-6 w-6" />
+          {unpurchasedCount > 0 && (
+            <motion.span 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-black text-white"
+            >
+              {unpurchasedCount}
+            </motion.span>
+          )}
+        </div>
         <span className="text-[10px] font-bold uppercase tracking-wider">Shop</span>
         {shoppingMode && (
           <motion.div 

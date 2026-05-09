@@ -138,11 +138,20 @@ export function VoiceInput({ onTranscript, className }: VoiceInputProps) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-surface-dark px-3 py-1 text-xs font-medium text-white shadow-xl"
+            className="absolute -top-16 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-2xl bg-black px-4 py-2 text-sm font-bold text-white shadow-2xl"
           >
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-3 w-3 animate-spin text-red-400" />
-              နားထောင်နေသည်...
+            <div className="flex items-center gap-3">
+              <div className="flex h-4 items-center gap-1">
+                {[...Array(3)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ height: [4, 12, 4] }}
+                    transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.15 }}
+                    className="w-1 rounded-full bg-red-400"
+                  />
+                ))}
+              </div>
+              <span className="font-myanmar">နားထောင်နေသည်...</span>
             </div>
           </motion.div>
         )}
