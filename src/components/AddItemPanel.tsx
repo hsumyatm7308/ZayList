@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, FormEvent } from 'react';
-import { Plus, X, Search, Hash, ChevronDown, ListPlus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStore } from '../lib/store';
 import { VoiceInput } from './VoiceInput';
 import { Category } from '../types';
 import { cn } from '../lib/utils';
+import { supabase } from '../lib/supabase';
 
 const CATEGORIES: Category[] = [
   'Food', 'Drinks', 'Snacks', 'Household', 'Bathroom', 'Kitchen', 'Medicine', 'Others'
@@ -14,10 +15,12 @@ export function AddItemPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState('');
   const [note, setNote] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [price, setPrice] = useState('');
   const [category, setCategory] = useState<Category>('Others');
-  const [showCategories, setShowCategories] = useState(false);
+  const [loading, setLoading] = useState(false);
   
-  const { addItem } = useStore();
+  const { user, household, addItem } = useStore();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -26,20 +29,47 @@ export function AddItemPanel() {
     }
   }, [isOpen]);
 
-  const handleSubmit = (e?: FormEvent) => {
+  const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !user || !household) return;
     
-    // Support multi-item add separated by commas or newlines
-    const itemNames = name.split(/[,\n]/).map(n => n.trim()).filter(n => n !== "");
-    
-    itemNames.forEach(itemName => {
-      addItem(itemName, note.trim(), category);
-    });
+    setLoading(true);
+    try {
+      const itemNames = name.split(/[,\n]/).map(n => n.trim()).filter(n => n !== "");
+      
+      const newItems = itemNames.map(itemName => ({
+        name: itemName,
+        note: note.trim(),
+        quantity: quantity || '1',
+        price: parseFloat(price) || 0,
+        category,
+        user_id: user.id,
+        household_id: household.id,
+        purchased: false
+      }));
 
-    setName('');
-    setNote('');
-    setIsOpen(false);
+      const { data, error } = await supabase
+        .from('grocery_items')
+        .insert(newItems)
+        .select();
+
+      if (error) throw error;
+      
+      // Update local store (optional since realtime listener will also pick it up, 
+      // but doing it here makes it feel faster)
+      // Actually UserProvider handles it via subscription.
+
+      setName('');
+      setNote('');
+      setQuantity('1');
+      setPrice('');
+      setIsOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert('Error saving item');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleVoiceTranscript = (text: string) => {
@@ -52,9 +82,9 @@ export function AddItemPanel() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-6 z-[90] flex h-16 w-16 items-center justify-center rounded-full bg-black text-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] active:bg-zinc-800"
+        className="fixed bottom-24 right-6 z-[90] flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-xl active:bg-black"
       >
-        <Plus className="h-8 w-8" />
+        <Plus className="h-6 w-6" />
       </motion.button>
 
       <AnimatePresence>
@@ -65,82 +95,116 @@ export function AddItemPanel() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md"
+              className="fixed inset-0 z-[150] bg-zinc-900/40 backdrop-blur-[2px]"
             />
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="fixed inset-x-0 bottom-0 z-[200] max-h-[90vh] overflow-y-auto rounded-t-[40px] bg-white p-8 pb-12 shadow-[0_-15px_50px_rgba(0,0,0,0.15)] safe-area-bottom"
+              className="fixed inset-x-0 bottom-0 z-[200] max-h-[90vh] overflow-y-auto rounded-t-2xl bg-white p-6 pb-12 shadow-2xl safe-area-bottom"
             >
-              <div className="mx-auto mb-8 h-1.5 w-16 rounded-full bg-black/10" />
+              <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-zinc-200" />
               
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold tracking-tight">Add Item</h2>
-                <button 
-                  onClick={() => setIsOpen(false)}
-                  className="rounded-full bg-black/5 p-2"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="relative">
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-black/5">
-                      <ListPlus className="h-6 w-6 opacity-40" />
-                    </div>
-                  </div>
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Eggs, Milk, Bread..."
-                    className="h-16 w-full border-b-2 border-black/5 pl-16 text-xl font-medium outline-none focus:border-black transition-colors"
-                  />
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2">
+                {/* Item Name */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold tracking-tight text-zinc-900">New Item</h2>
                     <VoiceInput onTranscript={handleVoiceTranscript} />
+                  </div>
+                  
+                  <div className="relative group">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="What do we need?"
+                      className="w-full bg-transparent text-lg font-medium outline-none placeholder:text-zinc-300 pb-2 border-b border-zinc-100 focus:border-zinc-300 transition-colors"
+                    />
                   </div>
                 </div>
 
-                <div className="relative">
+                {/* Optional Note */}
+                <div className="relative group">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Note</span>
+                  </div>
                   <input
                     type="text"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder="Add a simple note (optional)"
-                    className="h-12 w-full border-b border-black/5 text-sm outline-none focus:border-black transition-colors"
+                    placeholder="Add more details..."
+                    className="w-full bg-transparent text-sm outline-none placeholder:text-zinc-300 pb-1 border-b border-zinc-50 focus:border-zinc-200 transition-colors"
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-2 pt-2">
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setCategory(cat)}
-                      className={cn(
-                        "rounded-full px-4 py-2 text-xs font-bold uppercase tracking-widest transition-all",
-                        category === cat 
-                          ? "bg-black text-white shadow-lg shadow-black/20" 
-                          : "bg-black/5 text-black/40 hover:bg-black/10"
-                      )}
-                    >
-                      {cat}
-                    </button>
-                  ))}
+                {/* Stats Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Price (Ks)</span>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="1"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        placeholder="0"
+                        className="w-full bg-transparent text-sm font-semibold outline-none pb-1 border-b border-zinc-50 focus:border-zinc-200 transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Quantity</span>
+                    <input
+                      type="text"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      placeholder="1"
+                      className="w-full bg-transparent text-sm font-semibold outline-none pb-1 border-b border-zinc-50 focus:border-zinc-200 transition-colors"
+                    />
+                  </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={!name.trim()}
-                  className="h-16 w-full rounded-2xl bg-black font-bold uppercase tracking-widest text-white shadow-xl shadow-black/20 active:scale-[0.98] disabled:opacity-50"
-                >
-                  Save to List
-                </button>
+                {/* Categories */}
+                <div className="space-y-3">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Category</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CATEGORIES.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setCategory(cat)}
+                        className={cn(
+                          "rounded-md px-3 py-1 text-[11px] font-medium transition-all border",
+                          category === cat 
+                            ? "bg-zinc-100 text-zinc-900 border-zinc-300" 
+                            : "bg-transparent border-transparent text-zinc-500 hover:bg-zinc-50"
+                        )}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsOpen(false)}
+                    className="flex-1 h-12 rounded-lg bg-zinc-50 text-sm font-bold text-zinc-500 hover:bg-zinc-100 transition-all active:scale-[0.98]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!name.trim() || loading}
+                    className="flex-[2] h-12 rounded-lg bg-zinc-900 text-sm font-bold text-white hover:bg-black transition-all active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {loading ? 'Saving...' : 'Add to List'}
+                  </button>
+                </div>
               </form>
             </motion.div>
           </>

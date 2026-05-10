@@ -16,67 +16,62 @@ const storage = {
   },
 };
 
-export const useStore = create<AppState>()(
-  persist(
-    (set) => ({
-      items: [],
-      shoppingMode: false,
-      darkMode: true,
-      searchQuery: '',
-      sortBy: 'newest',
-      categoryFilter: 'All',
+export const useStore = create<AppState>()((set) => ({
+  user: null,
+  household: null,
+  items: [],
+  shoppingMode: false,
+  darkMode: true,
+  searchQuery: '',
+  sortBy: 'newest',
+  categoryFilter: 'All',
 
-      addItem: (name, note, category = 'Others') => 
-        set((state) => ({
-          items: [
-            {
-              id: crypto.randomUUID(),
-              name,
-              note,
-              category,
-              purchased: false,
-              createdAt: Date.now(),
-            },
-            ...state.items,
-          ],
-        })),
+  setUser: (user) => set({ user }),
+  setHousehold: (household) => set({ household }),
+  setItems: (items) => set({ items }),
 
-      updateItem: (id, updates) =>
-        set((state) => ({
-          items: state.items.map((item) =>
-            item.id === id ? { ...item, ...updates } : item
-          ),
-        })),
+  addItem: (item) => 
+    set((state) => ({
+      items: [item, ...state.items],
+    })),
 
-      deleteItem: (id) =>
-        set((state) => ({
-          items: state.items.filter((item) => item.id !== id),
-        })),
+  updateItem: (id, updates) =>
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.id === id ? { ...item, ...updates } : item
+      ),
+    })),
 
-      togglePurchased: (id) =>
-        set((state) => ({
-          items: state.items.map((item) =>
-            item.id === id ? { ...item, purchased: !item.purchased } : item
-          ),
-        })),
+  deleteItem: (id) =>
+    set((state) => ({
+      items: state.items.filter((item) => item.id !== id),
+    })),
 
-      clearPurchased: () =>
-        set((state) => ({
-          items: state.items.filter((item) => !item.purchased),
-        })),
+  togglePurchased: (id) =>
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.id === id 
+          ? { 
+              ...item, 
+              purchased: !item.purchased,
+              purchased_at: !item.purchased ? new Date().toISOString() : undefined
+            } 
+          : item
+      ),
+    })),
 
-      clearAllItems: () =>
-        set({ items: [] }),
-
-      setShoppingMode: (enabled) => set({ shoppingMode: enabled }),
-      setDarkMode: (enabled) => set({ darkMode: enabled }),
-      setSearchQuery: (query) => set({ searchQuery: query }),
-      setSortBy: (sort) => set({ sortBy: sort }),
-      setCategoryFilter: (category) => set({ categoryFilter: category }),
-    }),
-    {
-      name: 'zaylist-storage',
-      storage: createJSONStorage(() => storage as any),
-    }
-  )
-);
+  setShoppingMode: (enabled) => set({ shoppingMode: enabled }),
+  setDarkMode: (enabled) => set({ darkMode: enabled }),
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  setSortBy: (sort) => set({ sortBy: sort }),
+  setCategoryFilter: (category) => set({ categoryFilter: category }),
+  
+  reset: () => set({ 
+    user: null, 
+    household: null, 
+    items: [], 
+    shoppingMode: false,
+    searchQuery: '',
+    categoryFilter: 'All'
+  }),
+}));

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Trash2, Edit3, Circle, CheckCircle2 } from 'lucide-react';
-import { motion, useMotionValue, useTransform, AnimatePresence } from 'motion/react';
+import { Trash2, Edit3, Circle, CheckCircle2, User, AlertCircle } from 'lucide-react';
+import { motion, useMotionValue, useTransform } from 'motion/react';
 import { GroceryItem } from '../types';
 import { useStore } from '../lib/store';
 import { cn } from '../lib/utils';
@@ -8,6 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { EditItemModal } from './EditItemModal';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
+import { supabase } from '../lib/supabase';
 
 interface GroceryCardProps {
   item: GroceryItem;
@@ -15,11 +16,10 @@ interface GroceryCardProps {
 }
 
 export function GroceryCard({ item, isShoppingMode }: GroceryCardProps) {
-  const { togglePurchased, deleteItem } = useStore();
+  const { user } = useStore();
   const [isEditing, setIsEditing] = useState(false);
   const x = useMotionValue(0);
   
-  // Transform x position to background color and opacity for delete indicator
   const opacity = useTransform(x, [-100, -50, 0], [1, 0.5, 0]);
   const scale = useTransform(x, [-100, -50, 0], [1.2, 1, 0.8]);
 
@@ -27,7 +27,34 @@ export function GroceryCard({ item, isShoppingMode }: GroceryCardProps) {
     if (Capacitor.isNativePlatform()) {
       await Haptics.impact({ style: ImpactStyle.Light });
     }
-    togglePurchased(item.id);
+    
+    try {
+      const { error } = await supabase
+        .from('grocery_items')
+        .update({ 
+          purchased: !item.purchased,
+          purchased_at: !item.purchased ? new Date().toISOString() : null
+        })
+        .eq('id', item.id);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      alert('Error updating item');
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const { error } = await supabase
+        .from('grocery_items')
+        .delete()
+        .eq('id', item.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      alert('Error deleting item');
+    }
   };
 
   const handleDragEnd = async (_: any, info: any) => {
@@ -35,13 +62,12 @@ export function GroceryCard({ item, isShoppingMode }: GroceryCardProps) {
       if (Capacitor.isNativePlatform()) {
         await Haptics.notification({ type: 'error' as any });
       }
-      deleteItem(item.id);
+      handleDelete();
     }
   };
 
   return (
     <div className="relative overflow-hidden rounded-2xl">
-      {/* Delete background indicator */}
       <motion.div 
         style={{ opacity }}
         className="absolute inset-y-0 right-0 flex w-24 items-center justify-center bg-red-500 text-white"
@@ -61,62 +87,88 @@ export function GroceryCard({ item, isShoppingMode }: GroceryCardProps) {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, x: -20 }}
-        whileHover={!isShoppingMode ? { y: -2 } : {}}
         className={cn(
-          "group relative flex items-center gap-4 border border-black/5 bg-white p-4 transition-all duration-200",
-          item.purchased && !isShoppingMode && "opacity-60 grayscale-[0.5]"
+          "group relative flex items-center gap-3 border-b border-zinc-100 bg-white px-6 py-4 transition-all duration-200",
+          item.purchased && !isShoppingMode && "bg-zinc-50/50"
         )}
       >
         <button
           onClick={handleToggle}
           className={cn(
-            "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-all duration-300",
+            "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border transition-all duration-300",
             item.purchased 
-              ? "bg-green-500 text-white shadow-lg shadow-green-200" 
-              : "bg-surface text-surface-dark hover:scale-110 active:scale-95"
+              ? "bg-blue-600 border-blue-600 text-white" 
+              : "bg-white border-zinc-300 hover:border-zinc-400"
           )}
         >
-          {item.purchased ? <CheckCircle2 className="h-6 w-6" /> : <Circle className="h-6 w-6 opacity-20" />}
+          {item.purchased && <CheckCircle2 className="h-3.5 w-3.5" />}
         </button>
 
-        <div className="flex-grow overflow-hidden" onClick={() => !isShoppingMode && setIsEditing(true)}>
-          <div className="flex items-center gap-2">
-            <h3 className={cn(
-              "truncate text-lg font-medium transition-all duration-300",
-              item.purchased && "text-black/40 line-through decoration-black/30"
-            )}>
-              {item.name}
-            </h3>
-            <span className="hidden rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black/40 group-hover:block sm:block">
-              {item.category}
-            </span>
+        <div className="flex-grow overflow-hidden flex flex-col gap-0.5" onClick={() => !isShoppingMode && setIsEditing(true)}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <h3 className={cn(
+                "truncate text-sm font-medium transition-all duration-500",
+                item.purchased ? "text-zinc-400 line-through" : "text-zinc-900"
+              )}>
+                {item.name}
+              </h3>
+              <span className={cn(
+                "shrink-0 text-[10px] font-medium text-zinc-400 px-1.5 py-0.5 rounded bg-zinc-100/50",
+                item.purchased && "opacity-50"
+              )}>
+                {item.category}
+              </span>
+            </div>
+            {item.price > 0 ? (
+              <span className={cn(
+                "shrink-0 text-sm font-semibold tabular-nums transition-colors",
+                item.purchased ? "text-zinc-300" : "text-zinc-900"
+              )}>
+                {(item.price * (parseFloat(item.quantity) || 1)).toLocaleString()} Ks
+              </span>
+            ) : item.purchased && (
+              <span className="shrink-0 text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Missing price
+              </span>
+            )}
           </div>
-          {item.note && (
-            <p className={cn(
-              "mt-0.5 truncate text-sm text-black/50 transition-all duration-300",
-              item.purchased && "opacity-40"
+          
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "text-[11px] font-bold text-zinc-400",
+              item.purchased && "opacity-50"
             )}>
-              {item.note}
-            </p>
-          )}
-          <span className="mt-1 block text-[10px] text-black/20 font-medium uppercase tracking-widest">
-            {formatDistanceToNow(item.createdAt, { addSuffix: true })}
-          </span>
+              {item.quantity} {parseFloat(item.quantity) === 1 ? 'UNIT' : 'UNITS'}
+            </span>
+            {item.note && (
+              <>
+                <span className="text-zinc-200">/</span>
+                <p className={cn(
+                  "truncate text-[11px] transition-all duration-500",
+                  item.purchased ? "text-zinc-300" : "text-zinc-500"
+                )}>
+                  {item.note}
+                </p>
+              </>
+            )}
+          </div>
         </div>
 
         {!isShoppingMode && (
-          <div className="flex items-center gap-1 transition-opacity sm:opacity-0 group-hover:opacity-100">
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => setIsEditing(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-blue-500 hover:bg-blue-50 active:scale-90"
+              className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-zinc-100 text-zinc-400"
             >
-              <Edit3 className="h-5 w-5" />
+              <Edit3 className="h-4 w-4" />
             </button>
             <button
-              onClick={() => deleteItem(item.id)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-red-500 hover:bg-red-50 active:scale-90"
+              onClick={handleDelete}
+              className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-red-50 text-red-400"
             >
-              <Trash2 className="h-5 w-5" />
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         )}

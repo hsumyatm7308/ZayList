@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useContext } from 'react';
 import { Header } from './components/Header';
 import { FilterSection } from './components/FilterSection';
 import { GroceryCard } from './components/GroceryCard';
@@ -7,13 +7,22 @@ import { ConfirmationModal } from './components/ConfirmationModal';
 import { BottomNav } from './components/BottomNav';
 import { useStore } from './lib/store';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingCart, CheckCircle, PackageSearch, Trash2 } from 'lucide-react';
+import { ShoppingCart, CheckCircle, PackageSearch, Trash2, AlertCircle } from 'lucide-react';
 import { cn } from './lib/utils';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 
-export default function App() {
-  const { items, searchQuery, sortBy, categoryFilter, shoppingMode, clearAllItems, clearPurchased } = useStore();
+import { UserProvider, UserContext } from './components/UserProvider';
+import { AuthForm } from './components/auth/AuthForm';
+import { HouseholdManager } from './components/auth/HouseholdManager';
+import { Insights } from './components/Insights';
+import { SettingsView } from './components/SettingsView';
+
+function AppContent() {
+  const { user, household, items, searchQuery, sortBy, categoryFilter, shoppingMode } = useStore();
+  const { initialized } = useContext(UserContext);
+  const [activeTab, setActiveTab] = useState<'shopping' | 'insights' | 'settings'>('shopping');
+
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
@@ -21,201 +30,65 @@ export default function App() {
     onConfirm: () => {},
   });
 
-  const handleClearAll = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Clear everything?',
-      message: 'This will remove all items from your list. This action cannot be undone.',
-      onConfirm: clearAllItems,
-    });
-  };
+  if (!initialized) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white">
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+        >
+          <ShoppingCart className="h-10 w-10 text-zinc-100" />
+        </motion.div>
+      </div>
+    );
+  }
 
-  const handleClearPurchased = () => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Clear checked?',
-      message: 'Remove all items you have already purchased from the list?',
-      onConfirm: clearPurchased,
-    });
-  };
+  if (!user) {
+    return <AuthForm />;
+  }
 
-  const filteredItems = useMemo(() => {
-    let result = [...items];
-
-    // Filter by search
-    if (searchQuery) {
-      result = result.filter(item => 
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.note?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Filter by category
-    if (categoryFilter !== 'All') {
-      result = result.filter(item => item.category === categoryFilter);
-    }
-
-    // Filter for shopping mode
-    if (shoppingMode) {
-      result = result.filter(item => !item.purchased);
-    }
-
-    // Sort
-    result.sort((a, b) => {
-      // Always put purchased items at the bottom
-      if (a.purchased !== b.purchased) {
-        return a.purchased ? 1 : -1;
-      }
-      
-      if (sortBy === 'newest') return b.createdAt - a.createdAt;
-      return 0;
-    });
-
-    return result;
-  }, [items, searchQuery, sortBy, categoryFilter, shoppingMode]);
-
-  const purchasedCount = items.filter(i => i.purchased).length;
-  const totalCount = items.length;
-  const progress = totalCount > 0 ? (purchasedCount / totalCount) * 100 : 0;
-
-  useEffect(() => {
-    const setupNotifications = async () => {
-      if (Capacitor.getPlatform() !== 'web') {
-        const permission = await LocalNotifications.requestPermissions();
-        if (permission.display === 'granted') {
-          // Schedule a weekly reminder if the list isn't empty
-          if (items.length > 0) {
-            await LocalNotifications.schedule({
-              notifications: [
-                {
-                  title: "Grocery Reminder 🛒",
-                  body: `You have ${items.length} items on your list. Time to shop!`,
-                  id: 1,
-                  schedule: { at: new Date(Date.now() + 1000 * 60 * 60 * 24) }, // Next 24h
-                  sound: 'default'
-                }
-              ]
-            });
-          }
-        }
-      } else if ("Notification" in window && Notification.permission === "default") {
-        Notification.requestPermission();
-      }
-    };
-
-    setupNotifications();
-  }, [items.length]);
-
-  const isNative = Capacitor.isNativePlatform();
+  if (!household) {
+    return (
+      <div className="min-h-screen bg-zinc-50 p-6 flex items-center justify-center">
+        <div className="w-full max-w-md">
+          <HouseholdManager />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(
-      "min-h-screen bg-surface selection:bg-black selection:text-white",
-      isNative && "pb-20" // Extra padding for bottom nav
+      "min-h-screen bg-zinc-50 selection:bg-blue-50 selection:text-blue-900",
+      Capacitor.isNativePlatform() && "pb-20"
     )}>
       <div className={cn(
-        "mx-auto max-w-lg bg-white min-h-screen shadow-2xl shadow-black/5 relative pb-32",
-        isNative && "pb-40"
+        "mx-auto max-w-lg bg-white min-h-screen shadow-sm relative pb-32 border-x border-zinc-100",
+        Capacitor.isNativePlatform() && "pb-40"
       )}>
         <Header />
         
-        {!shoppingMode && <FilterSection />}
+        {activeTab === 'shopping' ? (
+          <>
+            {!shoppingMode && <FilterSection />}
 
-        <main className="px-6 space-y-4">
-          {/* Progress Bar (only when not in shopping mode) */}
-          {!shoppingMode && totalCount > 0 && (
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-black/40">
-                  Your Progress
-                </span>
-                <span className="text-[10px] font-bold text-black/60">
-                  {purchasedCount} / {totalCount} items
-                </span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-black/5">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  className="h-full bg-black transition-all"
-                />
-              </div>
+            <main className="space-y-4">
+              <GroceryList />
+            </main>
 
-              <div className="mt-4 flex flex-wrap justify-end gap-2">
-                {purchasedCount > 0 && (
-                  <button
-                    onClick={handleClearPurchased}
-                    className="flex items-center gap-2 rounded-xl bg-green-50 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-green-600 hover:bg-green-100 transition-all active:scale-95"
-                  >
-                    <CheckCircle className="h-3 w-3" />
-                    Clear Checked
-                  </button>
-                )}
-                <button
-                  onClick={handleClearAll}
-                  className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:bg-red-100 transition-all active:scale-95"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  Clear All
-                </button>
-              </div>
-            </div>
-          )}
+            {!shoppingMode && <AddItemPanel />}
+          </>
+        ) : activeTab === 'insights' ? (
+          <main className="px-6 py-6">
+            <Insights />
+          </main>
+        ) : (
+          <main className="py-2">
+            <SettingsView />
+          </main>
+        )}
 
-          {/* Heading for Shopping Mode */}
-          {shoppingMode && (
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="py-4"
-            >
-              <h2 className="text-3xl font-black tracking-tight flex items-center gap-3">
-                <ShoppingCart className="h-8 w-8 text-green-500" />
-                Shopping List
-              </h2>
-              <p className="mt-1 text-sm font-medium text-black/40">
-                Tap items to cross them off. Happy shopping!
-              </p>
-            </motion.div>
-          )}
-
-          <div className="space-y-4">
-            <AnimatePresence mode="popLayout" initial={false}>
-              {filteredItems.map((item) => (
-                <div key={item.id}>
-                  <GroceryCard 
-                    item={item} 
-                    isShoppingMode={shoppingMode} 
-                  />
-                </div>
-              ))}
-            </AnimatePresence>
-
-            {filteredItems.length === 0 && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center py-20 text-center"
-              >
-                <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-black/5 text-black/10">
-                  {shoppingMode ? <CheckCircle className="h-10 w-10" /> : <PackageSearch className="h-10 w-10" />}
-                </div>
-                <h3 className="text-xl font-bold tracking-tight">
-                  {shoppingMode ? "All done!" : "List is empty"}
-                </h3>
-                <p className="mt-1 text-sm font-medium text-black/30">
-                  {shoppingMode 
-                    ? "You've picked up everything from this list." 
-                    : "Add items or adjust filters to see results."}
-                </p>
-              </motion.div>
-            )}
-          </div>
-        </main>
-
-        {!shoppingMode && <AddItemPanel />}
-
-        <BottomNav />
+        <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
         <ConfirmationModal
           isOpen={confirmModal.isOpen}
@@ -226,5 +99,108 @@ export default function App() {
         />
       </div>
     </div>
+  );
+}
+
+function GroceryList() {
+  const { items, searchQuery, sortBy, categoryFilter, shoppingMode } = useStore();
+  
+  const filteredItems = useMemo(() => {
+    let result = [...items];
+    if (searchQuery) {
+      result = result.filter(item => 
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.note?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (categoryFilter !== 'All') {
+      result = result.filter(item => item.category === categoryFilter);
+    }
+    if (shoppingMode) {
+      result = result.filter(item => !item.purchased);
+    } else {
+      // Auto-clear logic: hide purchased & priced items after 24h
+      // But keep unpriced purchased items so user can input price
+      result = result.filter(item => {
+        if (!item.purchased) return true;
+        if (item.price === 0) return true; 
+        if (!item.purchased_at) return true;
+        
+        const purchaseDate = new Date(item.purchased_at);
+        const now = new Date();
+        const diffInHours = (now.getTime() - purchaseDate.getTime()) / (1000 * 60 * 60);
+        return diffInHours < 24;
+      });
+    }
+    result.sort((a, b) => {
+      if (a.purchased !== b.purchased) return a.purchased ? 1 : -1;
+      if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return 0;
+    });
+    return result;
+  }, [items, searchQuery, sortBy, categoryFilter, shoppingMode]);
+
+  return (
+    <div className="flex flex-col">
+      {shoppingMode && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="px-6 py-4 border-b border-zinc-100 bg-zinc-50/50"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-blue-500" />
+              <h2 className="text-sm font-bold text-zinc-900 tracking-tight">Shopping Mode</h2>
+            </div>
+            {filteredItems.some(i => i.purchased && i.price === 0) && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-50 border border-red-100 animate-pulse">
+                <AlertCircle className="h-3 w-3 text-red-500" />
+                <span className="text-[10px] font-bold text-red-600">UNPRICED ITEMS</span>
+              </div>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] font-medium text-zinc-400">
+            Checking off items you've found.
+          </p>
+        </motion.div>
+      )}
+
+      <AnimatePresence mode="popLayout" initial={false}>
+        {filteredItems.map((item) => (
+          <div key={item.id}>
+            <GroceryCard item={item} isShoppingMode={shoppingMode} />
+          </div>
+        ))}
+      </AnimatePresence>
+
+      {filteredItems.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center justify-center py-32 text-center px-6"
+        >
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-zinc-50 text-zinc-200">
+            {shoppingMode ? <CheckCircle className="h-6 w-6" /> : <PackageSearch className="h-6 w-6" />}
+          </div>
+          <h3 className="text-sm font-bold text-zinc-900">
+            {shoppingMode ? "All caught up" : "Empty workspace"}
+          </h3>
+          <p className="mt-1 text-xs text-zinc-400 leading-relaxed max-w-[200px]">
+            {shoppingMode 
+              ? "Everything has been cross off. Good job!" 
+              : "No items found. Start by adding something to the list."}
+          </p>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <UserProvider>
+      <AppContent />
+    </UserProvider>
   );
 }
